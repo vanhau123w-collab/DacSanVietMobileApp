@@ -8,12 +8,25 @@ export const loginUser = createAsyncThunk(
     async ({ username, password }, { rejectWithValue }) => {
         try {
             const data = await loginApi(username, password);
-            // Assuming data contains { token, user } or similar based on previous analysis
-            // Verify backend response format from authService.js
+            console.log('AuthSlice Login Data:', data); // DEBUG
+
+            if (!data || !data.token) {
+                // Try alternative structure commonly used
+                if (data?.data?.token) {
+                    data.token = data.data.token;
+                    data.user = data.data.user;
+                } else {
+                    throw new Error('Invalid response structure: Token missing');
+                }
+            }
+
             await AsyncStorage.setItem('jwt_token', data.token);
-            await AsyncStorage.setItem('user_info', JSON.stringify(data.user)); // Store user info if available
+            if (data.user) {
+                await AsyncStorage.setItem('user_info', JSON.stringify(data.user));
+            }
             return data;
         } catch (error) {
+            console.error('AuthSlice Login Error:', error);
             return rejectWithValue(error.message || 'Login failed');
         }
     }

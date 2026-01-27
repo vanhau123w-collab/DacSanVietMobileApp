@@ -3,8 +3,10 @@ import apiClient from './apiClient';
 export const login = async (username, password) => {
     try {
         const response = await apiClient.post('api/auth/login', { username, password });
+        console.log('Login API Response:', response.data); // DEBUG LOG
         return response.data;
     } catch (error) {
+        console.error('Login API Error:', error.response?.data || error.message);
         throw error.response ? error.response.data : error;
     }
 };
