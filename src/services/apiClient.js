@@ -1,8 +1,8 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 
-// 10.0.2.2 is special alias to your host loopback interface (i.e., 127.0.0.1 on your development machine)
-// Use this for Android Emulator.
-const BASE_URL = 'http://10.0.2.2:3001/';
+// Use localhost for Web/iOS, 10.0.2.2 for Android Emulator
+const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:3001/' : 'http://localhost:3001/';
 
 const apiClient = axios.create({
     baseURL: BASE_URL,

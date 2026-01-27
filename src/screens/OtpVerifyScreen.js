@@ -3,10 +3,10 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../styles/theme';
-import { verifyOtp, resendOtp } from '../api/authService';
+import { verifyOtp, resendOtp } from '../services/authService';
 
 const OtpVerifyScreen = ({ route, navigation }) => {
-    const { email, username, password, fullName } = route.params;
+    const { email, username, password, fullName, role } = route.params;
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [resendLoading, setResendLoading] = useState(false);
@@ -19,7 +19,7 @@ const OtpVerifyScreen = ({ route, navigation }) => {
 
         setLoading(true);
         try {
-            const response = await verifyOtp(email, otp, username, password, fullName);
+            const response = await verifyOtp(email, otp, username, password, fullName, role);
             if (response.success || response.isSuccess) {
                 if (response.token) {
                     await AsyncStorage.setItem('jwt_token', response.token);

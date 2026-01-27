@@ -23,14 +23,15 @@ export const register = async (email, username, password, fullName) => {
     }
 };
 
-export const verifyOtp = async (email, otp, username, password, fullName) => {
+export const verifyOtp = async (email, otp, username, password, fullName, role) => {
     try {
         const response = await apiClient.post('api/auth/verify-registration-otp', {
             email,
             otp,
             username,
             password,
-            fullName
+            fullName,
+            role
         });
         return response.data;
     } catch (error) {
