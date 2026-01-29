@@ -126,7 +126,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[LocalEmulator::path=C:\Users\vanha\.android\avd\Medium_Phone.avd]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -166,7 +166,7 @@
 }</component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/vanhau123w-collab/MobileApp2&quot;,
+    &quot;url&quot;: &quot;https://github.com/vanhau123w-collab/DacSanVietMobileApp.git&quot;,
     &quot;accountId&quot;: &quot;0fd7df02-b559-4995-84a9-38b074109649&quot;
   }
 }</component>

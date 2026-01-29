@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as loginApi } from '../../services/authService'; // Will rename api to services
+import { login as loginApi } from '../../services/authService';
+import { updateProfile, changePassword, uploadAvatar, sendEmailUpdateOTP, verifyEmailUpdate } from '../../services/profileService';
 
 // Async Thunks
 export const loginUser = createAsyncThunk(
@@ -41,6 +42,71 @@ export const logoutUser = createAsyncThunk(
             return true;
         } catch (error) {
             return rejectWithValue('Logout failed');
+        }
+    }
+);
+
+// Update Profile Thunk
+export const updateUserProfile = createAsyncThunk(
+    'auth/updateProfile',
+    async (updateData, { rejectWithValue }) => {
+        try {
+            const data = await updateProfile(updateData);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Update failed');
+        }
+    }
+);
+
+// Change Password Thunk
+export const changeUserPassword = createAsyncThunk(
+    'auth/changePassword',
+    async ({ currentPassword, newPassword }, { rejectWithValue }) => {
+        try {
+            const data = await changePassword(currentPassword, newPassword);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Change password failed');
+        }
+    }
+);
+
+// Upload Avatar Thunk
+export const uploadUserAvatar = createAsyncThunk(
+    'auth/uploadAvatar',
+    async (avatarUri, { rejectWithValue }) => {
+        try {
+            const data = await uploadAvatar(avatarUri);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Avatar upload failed');
+        }
+    }
+);
+
+// Send Email OTP Thunk
+export const sendEmailOtp = createAsyncThunk(
+    'auth/sendEmailOtp',
+    async (newEmail, { rejectWithValue }) => {
+        try {
+            const data = await sendEmailUpdateOTP(newEmail);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to send OTP');
+        }
+    }
+);
+
+// Verify Email Change Thunk
+export const verifyEmailChange = createAsyncThunk(
+    'auth/verifyEmailChange',
+    async ({ newEmail, otpCode }, { rejectWithValue }) => {
+        try {
+            const data = await verifyEmailUpdate({ newEmail, otpCode });
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to verify OTP');
         }
     }
 );
@@ -114,6 +180,54 @@ const authSlice = createSlice({
                 state.isAuthenticated = false;
                 state.token = null;
                 state.user = null;
+            })
+            // Update Profile
+            .addCase(updateUserProfile.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(updateUserProfile.fulfilled, (state, action) => {
+                state.loading = false;
+                // Assuming the API returns the updated user object in action.payload.data.user
+                // Based on the user's test script: response.data.data.user
+                if (action.payload?.data?.user) {
+                    state.user = action.payload.data.user;
+                    AsyncStorage.setItem('user_info', JSON.stringify(state.user));
+                }
+            })
+            .addCase(updateUserProfile.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            // Change Password
+            .addCase(changeUserPassword.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(changeUserPassword.fulfilled, (state) => {
+                state.loading = false;
+                // Password changed successfully
+            })
+            .addCase(changeUserPassword.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            // Upload Avatar
+            .addCase(uploadUserAvatar.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(uploadUserAvatar.fulfilled, (state, action) => {
+                state.loading = false;
+                // Update user avatar in state
+                if (action.payload?.data?.user) {
+                    state.user = action.payload.data.user;
+                    AsyncStorage.setItem('user_info', JSON.stringify(state.user));
+                }
+            })
+            .addCase(uploadUserAvatar.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     },
 });

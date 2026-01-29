@@ -59,10 +59,10 @@ const HomeScreen = ({ navigation }) => {
 
             {/* Top Bar */}
             <View style={tw`flex-row justify-between items-center px-4 py-3 bg-white`}>
-                <View>
+                <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
                     <Text style={tw`text-gray-500 text-xs`}>Xin chào,</Text>
                     <Text style={tw`text-gray-900 font-bold text-lg`}>{user.fullName || user.username}</Text>
-                </View>
+                </TouchableOpacity>
                 <View style={tw`flex-row gap-3`}>
                     <TouchableOpacity style={tw`relative bg-gray-100 p-2 rounded-full`}>
                         <Ionicons name="notifications-outline" size={22} color="#374151" />
