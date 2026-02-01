@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, Dimensions, FlatList, TextInput } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, TouchableOpacity, Image, Dimensions, FlatList, TextInput, RefreshControl } from 'react-native';
 import { Text, Avatar, ActivityIndicator, Badge, IconButton } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { loadUser, logoutUser } from '../store/slices/authSlice';
@@ -7,13 +7,23 @@ import tw from 'twrnc';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { getProducts, getProductCategories } from '../services/productService';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
     const dispatch = useDispatch();
-    const { user, loading, isAuthenticated } = useSelector((state) => state.auth);
+    const { user, loading: authLoading, isAuthenticated } = useSelector((state) => state.auth);
+
+    // Data State
+    const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [loadingProducts, setLoadingProducts] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Filter State
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState(null); // null means 'All'
 
     useEffect(() => {
         const initAuth = async () => {
@@ -30,28 +40,79 @@ const HomeScreen = ({ navigation }) => {
         initAuth();
     }, [isAuthenticated, user, dispatch, navigation]);
 
-    if (loading || !user) {
+    const fetchData = useCallback(async () => {
+        try {
+            setLoadingProducts(true);
+
+            // Fetch Categories
+            const cats = await getProductCategories();
+            // Assuming cats is an array of strings ["Name1", "Name2"]
+            // Map to objects for UI if needed or keep as strings. 
+            // We'll mimic the UI object structure but with default icons if needed.
+            const formattedCats = cats.map((name, index) => ({
+                id: index,
+                name: name,
+                // Placeholder icons since API only returns names
+                icon: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'
+            }));
+            setCategories(formattedCats);
+
+            // Fetch Products
+            await fetchProductsList();
+
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        } finally {
+            setLoadingProducts(false);
+            setRefreshing(false);
+        }
+    }, []);
+
+    const fetchProductsList = async () => {
+        try {
+            const params = {
+                q: searchQuery,
+                category: selectedCategory,
+                limit: 20
+            };
+            const result = await getProducts(params);
+            if (result.success) {
+                setProducts(result.data);
+            }
+        } catch (error) {
+            console.error('Error fetching products:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    // Refetch when search or category changes, with debounce for search
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            fetchProductsList();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery, selectedCategory]);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchData();
+    };
+
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    };
+
+    if (authLoading || !user) {
         return (
             <View style={tw`flex-1 justify-center items-center bg-white`}>
                 <ActivityIndicator size="large" color="#F59E0B" />
             </View>
         );
     }
-
-    const categories = [
-        { id: 1, name: 'Lạp xưởng', icon: 'https://images.unsplash.com/photo-1593504049359-74330189a345?w=200&h=200&fit=crop' },
-        { id: 2, name: 'Giò chả', icon: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=200&h=200&fit=crop' },
-        { id: 3, name: 'Khô gà', icon: 'https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=200&h=200&fit=crop' },
-        { id: 4, name: 'Quà Tết', icon: 'https://images.unsplash.com/photo-1612151855475-877969f4a6cc?w=200&h=200&fit=crop' },
-        { id: 5, name: 'Bánh Tét', icon: 'https://images.unsplash.com/photo-1644314264292-1dc3e561a06e?w=200&h=200&fit=crop' },
-    ];
-
-    const products = [
-        { id: 1, name: 'Lạp xưởng Mai Quế Lộ', price: '250.000đ', rating: 4.8, image: 'https://images.unsplash.com/photo-1593504049359-74330189a345?w=500' },
-        { id: 2, name: 'Giò lụa thượng hạng', price: '180.000đ', rating: 4.5, image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=500' },
-        { id: 3, name: 'Set quà Tết An Khang', price: '850.000đ', rating: 5.0, image: 'https://images.unsplash.com/photo-1612151855475-877969f4a6cc?w=500' },
-        { id: 4, name: 'Khô bò 1 nắng', price: '550.000đ', rating: 4.7, image: 'https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=500' },
-    ];
 
     return (
         <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['right', 'top', 'left']}>
@@ -83,12 +144,24 @@ const HomeScreen = ({ navigation }) => {
                         placeholder="Bạn đang tìm món ngon gì?"
                         style={tw`flex-1 ml-2 text-gray-700 h-full`}
                         placeholderTextColor="#9CA3AF"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        returnKeyType="search"
                     />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                            <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-24`}>
-                {/* Hero Banner */}
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={tw`pb-24`}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            >
+                {/* Hero Banner - Only show if no search/filter active to reduce clutter? Or keep it? Keeping it for now. */}
                 <View style={tw`px-4 mt-4`}>
                     <View style={tw`rounded-2xl overflow-hidden h-48 relative shadow-md`}>
                         <Image
@@ -109,50 +182,94 @@ const HomeScreen = ({ navigation }) => {
 
                 {/* Categories */}
                 <View style={tw`mt-6`}>
-                    <Text style={tw`px-4 text-lg font-bold text-gray-900 mb-3`}>Danh mục</Text>
+                    <View style={tw`flex-row justify-between items-center px-4 mb-3`}>
+                        <Text style={tw`text-lg font-bold text-gray-900`}>Danh mục</Text>
+                        {selectedCategory && (
+                            <TouchableOpacity onPress={() => setSelectedCategory(null)}>
+                                <Text style={tw`text-orange-600 font-semibold text-xs`}>Xóa lọc</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`px-4`}>
+                        <TouchableOpacity
+                            style={tw`mr-4 items-center`}
+                            onPress={() => setSelectedCategory(null)}
+                        >
+                            <View style={tw`w-16 h-16 rounded-full ${selectedCategory === null ? 'bg-orange-100 border-orange-500 border-2' : 'bg-white border-gray-100 border'} p-1 justify-center items-center shadow-sm mb-2`}>
+                                <Ionicons name="grid-outline" size={24} color={selectedCategory === null ? '#EA580C' : '#6B7280'} />
+                            </View>
+                            <Text style={tw`text-xs font-medium ${selectedCategory === null ? 'text-orange-600 font-bold' : 'text-gray-700'}`}>Tất cả</Text>
+                        </TouchableOpacity>
+
                         {categories.map((cat) => (
-                            <TouchableOpacity key={cat.id} style={tw`mr-4 items-center`}>
-                                <View style={tw`w-16 h-16 rounded-full bg-white p-1 border border-gray-100 shadow-sm mb-2`}>
+                            <TouchableOpacity
+                                key={cat.name} // Use name as key since API returns names
+                                style={tw`mr-4 items-center`}
+                                onPress={() => setSelectedCategory(cat.name === selectedCategory ? null : cat.name)}
+                            >
+                                <View style={tw`w-16 h-16 rounded-full ${selectedCategory === cat.name ? 'border-orange-500 border-2' : 'border-gray-100 border'} bg-white p-1 shadow-sm mb-2`}>
                                     <Image source={{ uri: cat.icon }} style={tw`w-full h-full rounded-full`} />
                                 </View>
-                                <Text style={tw`text-xs font-medium text-gray-700`}>{cat.name}</Text>
+                                <Text style={tw`text-xs font-medium ${selectedCategory === cat.name ? 'text-orange-600 font-bold' : 'text-gray-700'}`}>{cat.name}</Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
 
-                {/* Popular Products */}
+                {/* Products List */}
                 <View style={tw`mt-6 px-4`}>
                     <View style={tw`flex-row justify-between items-center mb-4`}>
-                        <Text style={tw`text-lg font-bold text-gray-900`}>Bán chạy nhất</Text>
-                        <TouchableOpacity>
-                            <Text style={tw`text-orange-600 font-semibold text-sm`}>Xem tất cả</Text>
-                        </TouchableOpacity>
+                        <Text style={tw`text-lg font-bold text-gray-900`}>
+                            {searchQuery ? `Kết quả tìm kiếm: "${searchQuery}"` : 'Sản phẩm nổi bật'}
+                        </Text>
+                        {!searchQuery && (
+                            <TouchableOpacity>
+                                <Text style={tw`text-orange-600 font-semibold text-sm`}>Xem tất cả</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
-                    <View style={tw`flex-row flex-wrap justify-between`}>
-                        {products.map((product) => (
-                            <TouchableOpacity key={product.id} style={tw`w-[48%] bg-white rounded-xl mb-4 shadow-sm border border-gray-100 overflow-hidden`}>
-                                <View style={tw`h-36 relative`}>
-                                    <Image source={{ uri: product.image }} style={tw`w-full h-full`} resizeMode="cover" />
-                                    <View style={tw`absolute top-2 right-2 bg-white/90 px-1.5 py-0.5 rounded-md flex-row items-center`}>
-                                        <Ionicons name="star" size={10} color="#F59E0B" />
-                                        <Text style={tw`text-[10px] font-bold ml-1`}>{product.rating}</Text>
+                    {loadingProducts ? (
+                        <View style={tw`h-40 justify-center items-center`}>
+                            <ActivityIndicator color="#F59E0B" />
+                        </View>
+                    ) : products.length === 0 ? (
+                        <View style={tw`h-40 justify-center items-center`}>
+                            <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                            <Text style={tw`text-gray-400 mt-2`}>Không tìm thấy sản phẩm nào</Text>
+                        </View>
+                    ) : (
+                        <View style={tw`flex-row flex-wrap justify-between`}>
+                            {products.map((product) => (
+                                <TouchableOpacity
+                                    key={product.id}
+                                    style={tw`w-[48%] bg-white rounded-xl mb-4 shadow-sm border border-gray-100 overflow-hidden`}
+                                    onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
+                                >
+                                    <View style={tw`h-36 relative`}>
+                                        <Image
+                                            source={{ uri: product.imageUrl || 'https://via.placeholder.com/150' }}
+                                            style={tw`w-full h-full`}
+                                            resizeMode="cover"
+                                        />
+                                        <View style={tw`absolute top-2 right-2 bg-white/90 px-1.5 py-0.5 rounded-md flex-row items-center`}>
+                                            <Ionicons name="star" size={10} color="#F59E0B" />
+                                            <Text style={tw`text-[10px] font-bold ml-1`}>{product.rating || '5.0'}</Text>
+                                        </View>
                                     </View>
-                                </View>
-                                <View style={tw`p-3`}>
-                                    <Text style={tw`font-semibold text-gray-800 text-sm mb-1 h-10`} numberOfLines={2}>{product.name}</Text>
-                                    <View style={tw`flex-row justify-between items-center mt-1`}>
-                                        <Text style={tw`font-bold text-orange-600`}>{product.price}</Text>
-                                        <TouchableOpacity style={tw`bg-orange-100 p-1.5 rounded-full`}>
-                                            <Ionicons name="add" size={16} color="#D97706" />
-                                        </TouchableOpacity>
+                                    <View style={tw`p-3`}>
+                                        <Text style={tw`font-semibold text-gray-800 text-sm mb-1 h-10`} numberOfLines={2}>{product.name}</Text>
+                                        <View style={tw`flex-row justify-between items-center mt-1`}>
+                                            <Text style={tw`font-bold text-orange-600 text-xs`}>{formatCurrency(product.price)}</Text>
+                                            <TouchableOpacity style={tw`bg-orange-100 p-1.5 rounded-full`}>
+                                                <Ionicons name="add" size={16} color="#D97706" />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
                 </View>
 
             </ScrollView>

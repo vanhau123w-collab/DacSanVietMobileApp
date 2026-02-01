@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import tw from 'twrnc';
-import { changeUserPassword, clearError } from '../store/slices/authSlice';
+import { changeUserPassword, clearError, sendPasswordChangeOtpThunk } from '../store/slices/authSlice';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ChangePasswordScreen = ({ navigation }) => {
     const dispatch = useDispatch();
-    const { loading, error } = useSelector((state) => state.auth);
+    const { user, loading, error } = useSelector((state) => state.auth);
+
+    useEffect(() => {
+        console.log('ChangePasswordScreen Mounted. User:', user);
+    }, [user]);
 
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -36,21 +40,33 @@ const ChangePasswordScreen = ({ navigation }) => {
             return;
         }
 
-        dispatch(changeUserPassword({ currentPassword, newPassword }))
+        console.log('Dispatching sendResetOtp for email:', user?.email);
+
+        if (!user?.email) {
+            Alert.alert('Lỗi', 'Không tìm thấy địa chỉ Email của người dùng');
+            return;
+        }
+
+        // Use Password Change OTP Flow
+        dispatch(sendPasswordChangeOtpThunk(currentPassword))
             .unwrap()
-            .then(() => {
-                const msg = 'Đổi mật khẩu thành công';
-                if (Platform.OS === 'web') {
-                    alert(msg);
-                    navigation.goBack();
-                } else {
-                    Alert.alert('Thành công', msg, [
-                        { text: 'OK', onPress: () => navigation.goBack() }
-                    ]);
-                }
+            .then((response) => {
+                // Capture otpToken from response
+                const otpToken = response?.data?.data?.otpToken || response?.data?.otpToken || response?.otpToken;
+                console.log('Password Change OTP Token received:', otpToken);
+
+                navigation.navigate('OtpVerify', {
+                    type: 'CHANGE_PASSWORD_OTP',
+                    email: user.email,
+                    currentPassword: currentPassword,
+                    newPassword: newPassword,
+                    username: user.username,
+                    otpToken: otpToken
+                });
             })
             .catch((err) => {
-                // Error is handled in useEffect
+                // Error handled in useEffect
+                Alert.alert('Error', err || 'Failed to send OTP');
             });
     };
 

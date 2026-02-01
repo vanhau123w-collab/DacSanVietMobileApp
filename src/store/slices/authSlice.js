@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as loginApi } from '../../services/authService';
-import { updateProfile, changePassword, uploadAvatar, sendEmailUpdateOTP, verifyEmailUpdate } from '../../services/profileService';
+import { login as loginApi, sendPasswordResetOtp, resetPasswordWithOtp } from '../../services/authService';
+import { updateProfile, changePassword, uploadAvatar, sendEmailUpdateOTP, verifyEmailUpdate, sendPhoneUpdateOtp, verifyPhoneUpdateOtp, sendPasswordChangeOtp, verifyPasswordChangeOtp } from '../../services/profileService';
 
 // Async Thunks
 export const loginUser = createAsyncThunk(
@@ -9,11 +9,15 @@ export const loginUser = createAsyncThunk(
     async ({ username, password }, { rejectWithValue }) => {
         try {
             const data = await loginApi(username, password);
-            console.log('AuthSlice Login Data:', data); // DEBUG
+            console.log('AuthSlice Login Data:', JSON.stringify(data, null, 2)); // DEBUG JSON
 
             if (!data || !data.token) {
-                // Try alternative structure commonly used
-                if (data?.data?.token) {
+                // Check for nested structure: data.data.tokens.accessToken
+                if (data?.data?.tokens?.accessToken) {
+                    data.token = data.data.tokens.accessToken;
+                    data.user = data.data.user;
+                } else if (data?.data?.token) {
+                    // Fallback for previous structure just in case
                     data.token = data.data.token;
                     data.user = data.data.user;
                 } else {
@@ -101,15 +105,94 @@ export const sendEmailOtp = createAsyncThunk(
 // Verify Email Change Thunk
 export const verifyEmailChange = createAsyncThunk(
     'auth/verifyEmailChange',
-    async ({ newEmail, otpCode }, { rejectWithValue }) => {
+    async ({ newEmail, otpCode, otpToken }, { rejectWithValue }) => {
         try {
-            const data = await verifyEmailUpdate({ newEmail, otpCode });
+            const data = await verifyEmailUpdate({ newEmail, otpCode, otpToken });
             return data;
         } catch (error) {
             return rejectWithValue(error.message || 'Failed to verify OTP');
         }
     }
 );
+
+// Send Phone OTP Thunk
+export const sendPhoneOtp = createAsyncThunk(
+    'auth/sendPhoneOtp',
+    async (newPhone, { rejectWithValue }) => {
+        try {
+            const data = await sendPhoneUpdateOtp(newPhone);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to send Phone OTP');
+        }
+    }
+);
+
+// Verify Phone Change Thunk
+export const verifyPhoneChange = createAsyncThunk(
+    'auth/verifyPhoneChange',
+    async ({ newPhone, otpCode, otpToken }, { rejectWithValue }) => {
+        try {
+            const data = await verifyPhoneUpdateOtp({ newPhone, otpCode, otpToken });
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to verify Phone OTP');
+        }
+    }
+);
+
+// Send Password Change OTP Thunk
+export const sendPasswordChangeOtpThunk = createAsyncThunk(
+    'auth/sendPasswordChangeOtp',
+    async (currentPassword, { rejectWithValue }) => {
+        try {
+            const data = await sendPasswordChangeOtp(currentPassword);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to send OTP');
+        }
+    }
+);
+
+// Verify Password Change Thunk
+export const verifyPasswordChange = createAsyncThunk(
+    'auth/verifyPasswordChange',
+    async ({ currentPassword, newPassword, otpCode, otpToken }, { rejectWithValue }) => {
+        try {
+            const data = await verifyPasswordChangeOtp({ currentPassword, newPassword, otpCode, otpToken });
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to verify OTP');
+        }
+    }
+);
+
+// Send Password Reset OTP Thunk
+export const sendResetOtp = createAsyncThunk(
+    'auth/sendResetOtp',
+    async (email, { rejectWithValue }) => {
+        try {
+            const data = await sendPasswordResetOtp(email);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to send OTP');
+        }
+    }
+);
+
+// Reset Password with OTP Thunk
+export const resetPassword = createAsyncThunk(
+    'auth/resetPassword',
+    async ({ email, otp, newPassword }, { rejectWithValue }) => {
+        try {
+            const data = await resetPasswordWithOtp(email, otp, newPassword);
+            return data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to reset password');
+        }
+    }
+);
+
 
 export const loadUser = createAsyncThunk(
     'auth/loadUser',
@@ -226,6 +309,34 @@ const authSlice = createSlice({
                 }
             })
             .addCase(uploadUserAvatar.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            // Verify Phone Change
+            .addCase(verifyPhoneChange.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(verifyPhoneChange.fulfilled, (state, action) => {
+                state.loading = false;
+                if (action.payload?.data?.user) {
+                    state.user = action.payload.data.user;
+                    AsyncStorage.setItem('user_info', JSON.stringify(state.user));
+                }
+            })
+            .addCase(verifyPhoneChange.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            // Reset Password
+            .addCase(resetPassword.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(resetPassword.fulfilled, (state) => {
+                state.loading = false;
+            })
+            .addCase(resetPassword.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

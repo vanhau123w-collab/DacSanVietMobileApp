@@ -29,7 +29,7 @@ export const verifyOtp = async (email, otp, username, password, fullName, role) 
     try {
         const response = await apiClient.post('api/auth/verify-registration-otp', {
             email,
-            otp,
+            otpCode: otp,
             username,
             password,
             fullName,

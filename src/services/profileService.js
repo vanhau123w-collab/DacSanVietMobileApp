@@ -96,3 +96,56 @@ export const verifyEmailUpdate = async (data) => {
         throw error.response ? error.response.data : error;
     }
 };
+
+export const sendPhoneUpdateOtp = async (newPhone) => {
+    try {
+        const response = await apiClient.post('api/profile/phone/send-otp', { newPhone });
+        return response.data;
+    } catch (error) {
+        console.error('Send Phone OTP Error:', error.response?.data || error.message);
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const verifyPhoneUpdateOtp = async (data) => {
+    try {
+        console.log('Verifying Phone OTP Payload:', JSON.stringify(data, null, 2)); // DEBUG
+        const response = await apiClient.post('api/profile/phone/verify-otp', data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        console.log('Verify Phone OTP Response:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Verify Phone OTP Error:', error.response?.data || error.message);
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const sendPasswordChangeOtp = async (currentPassword) => {
+    try {
+        const response = await apiClient.post('api/profile/password/send-otp', { currentPassword });
+        return response.data;
+    } catch (error) {
+        console.error('Send Password Change OTP Error:', error.response?.data || error.message);
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const verifyPasswordChangeOtp = async (data) => {
+    try {
+        console.log('Verifying Password Change OTP Payload:', JSON.stringify(data, null, 2)); // DEBUG
+        const response = await apiClient.post('api/profile/password/verify-otp', data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        console.log('Verify Password Change OTP Response:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Verify Password Change OTP Error:', error.response?.data || error.message);
+        throw error.response ? error.response.data : error;
+    }
+};
+

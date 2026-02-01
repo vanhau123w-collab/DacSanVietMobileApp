@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../styles/theme';
 import { verifyOtp, resendOtp } from '../services/authService';
+import { useDispatch } from 'react-redux';
+import { verifyPhoneChange as verifyPhoneChangeAction, verifyPasswordChange } from '../store/slices/authSlice';
 
 const OtpVerifyScreen = ({ route, navigation }) => {
-    const { email, username, password, fullName, role } = route.params;
+    // Debug Log to confirm new code is loaded
+    useEffect(() => {
+        console.log('OtpVerifyScreen Loaded');
+        console.log('Route Params:', route.params);
+    }, []);
+
+    const { email, username, password, fullName, role, type, phoneNumber, newPassword, otpToken, currentPassword } = route.params;
+    const dispatch = useDispatch();
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [resendLoading, setResendLoading] = useState(false);
@@ -19,14 +28,44 @@ const OtpVerifyScreen = ({ route, navigation }) => {
 
         setLoading(true);
         try {
+            if (type === 'CHANGE_PASSWORD_OTP') {
+                console.log('CHANGE_PASSWORD_OTP - currentPassword:', currentPassword, 'newPassword:', newPassword, 'otp:', otp, 'otpToken:', otpToken);
+                dispatch(verifyPasswordChange({ currentPassword, newPassword, otpCode: otp, otpToken }))
+                    .unwrap()
+                    .then(() => {
+                        Alert.alert('Success', 'Password changed successfully!');
+                        navigation.navigate('Profile');
+                    })
+                    .catch((err) => {
+                        Alert.alert('Verification Failed', err || 'Invalid OTP');
+                    })
+                    .finally(() => setLoading(false));
+                return;
+            }
+
+            if (type === 'UPDATE_PHONE') {
+                console.log('UPDATE_PHONE - phoneNumber:', phoneNumber, 'otp:', otp, 'otpToken:', otpToken);
+                dispatch(verifyPhoneChangeAction({ newPhone: phoneNumber, otpCode: otp, otpToken: otpToken }))
+                    .unwrap()
+                    .then(() => {
+                        Alert.alert('Success', 'Phone number updated successfully!');
+                        navigation.goBack();
+                    })
+                    .catch((err) => {
+                        Alert.alert('Verification Failed', err || 'Invalid OTP');
+                    })
+                    .finally(() => setLoading(false));
+                return;
+            }
+
+            // Default: Registration Verification
+            console.log('Verifying Registration OTP with payload:', { email, otp, username, password, fullName, role });
             const response = await verifyOtp(email, otp, username, password, fullName, role);
             if (response.success || response.isSuccess) {
                 if (response.token) {
                     await AsyncStorage.setItem('jwt_token', response.token);
                 }
                 Alert.alert('Success', 'Verification successful!');
-                // Ideally navigate to Home or Login
-                // Kotlin code went to MainActivty (Home)
                 navigation.reset({
                     index: 0,
                     routes: [{ name: 'Home' }],
@@ -35,9 +74,10 @@ const OtpVerifyScreen = ({ route, navigation }) => {
                 Alert.alert('Verification Failed', response.message || 'Invalid OTP');
             }
         } catch (error) {
-            Alert.alert('Verification Failed', error.message || 'Something went wrong');
+            console.log('Verify OTP Error Details:', JSON.stringify(error, null, 2));
+            Alert.alert('Verification Failed', error.message || JSON.stringify(error) || 'Something went wrong');
         } finally {
-            setLoading(false);
+            if (type !== 'UPDATE_PHONE' && type !== 'CHANGE_PASSWORD_OTP') setLoading(false);
         }
     };
 
@@ -61,7 +101,13 @@ const OtpVerifyScreen = ({ route, navigation }) => {
         <SafeAreaView style={styles.container}>
             <View style={styles.formContainer}>
                 <Text style={styles.title}>Verify OTP</Text>
-                <Text style={styles.subtitle}>Enter the code sent to {email}</Text>
+                <Text style={styles.subtitle}>
+                    {type === 'UPDATE_PHONE'
+                        ? `Enter the code sent to ${email} to verify phone change`
+                        : type === 'CHANGE_PASSWORD_OTP'
+                            ? `Enter the code sent to ${email} to change password`
+                            : `Enter the code sent to ${email}`}
+                </Text>
 
                 <TextInput
                     style={styles.input}

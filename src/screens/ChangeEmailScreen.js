@@ -12,6 +12,7 @@ const ChangeEmailScreen = ({ navigation }) => {
     const [step, setStep] = useState(1); // 1: Input Email, 2: Verify OTP
     const [newEmail, setNewEmail] = useState('');
     const [otpCode, setOtpCode] = useState('');
+    const [otpToken, setOtpToken] = useState(''); // Store OTP token
 
     useEffect(() => {
         if (error) {
@@ -28,7 +29,12 @@ const ChangeEmailScreen = ({ navigation }) => {
 
         dispatch(sendEmailOtp(newEmail.trim()))
             .unwrap()
-            .then(() => {
+            .then((response) => {
+                // Capture otpToken from response
+                const token = response?.data?.data?.otpToken || response?.data?.otpToken || response?.otpToken;
+                console.log('Email OTP Token received:', token);
+                setOtpToken(token);
+
                 const msg = 'Mã OTP đã được gửi đến email mới của bạn';
                 if (Platform.OS === 'web') alert(msg);
                 else Alert.alert('Thành công', msg);
@@ -43,7 +49,7 @@ const ChangeEmailScreen = ({ navigation }) => {
             return;
         }
 
-        dispatch(verifyEmailChange({ newEmail: newEmail.trim(), otpCode: otpCode.trim() }))
+        dispatch(verifyEmailChange({ newEmail: newEmail.trim(), otpCode: otpCode.trim(), otpToken }))
             .unwrap()
             .then(() => {
                 const msg = 'Cập nhật email thành công. Vui lòng đăng nhập lại.';

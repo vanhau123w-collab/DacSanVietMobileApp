@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Plat
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import tw from 'twrnc';
-import { updateUserProfile, uploadUserAvatar, clearError } from '../store/slices/authSlice';
+import { updateUserProfile, uploadUserAvatar, clearError, sendPhoneOtp } from '../store/slices/authSlice';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BASE_URL } from '../services/apiClient';
 
@@ -63,21 +63,80 @@ const EditProfileScreen = ({ navigation }) => {
             return;
         }
 
-        dispatch(updateUserProfile({ fullName, phoneNumber }))
-            .unwrap()
-            .then(() => {
-                if (Platform.OS === 'web') {
-                    alert('Cập nhật hồ sơ thành công');
-                    navigation.goBack();
-                } else {
-                    Alert.alert('Thành công', 'Cập nhật hồ sơ thành công', [
-                        { text: 'OK', onPress: () => navigation.goBack() }
-                    ]);
-                }
-            })
-            .catch((err) => {
-                // Error is handled in useEffect
-            });
+        const isPhoneChanged = phoneNumber !== (user.phoneNumber || '');
+        const isNameChanged = fullName !== (user.fullName || '');
+
+        if (!isPhoneChanged && !isNameChanged) {
+            navigation.goBack();
+            return;
+        }
+
+        // If phone changed, prioritize Phone OTP flow
+        if (isPhoneChanged) {
+            dispatch(sendPhoneOtp(phoneNumber))
+                .unwrap()
+                .then((response) => {
+                    // Capture otpToken from response
+                    console.log('Phone OTP Full Response:', JSON.stringify(response, null, 2));
+                    const otpToken = response?.data?.data?.otpToken || response?.data?.otpToken || response?.otpToken;
+                    console.log('Phone OTP Token received:', otpToken);
+
+                    if (!otpToken) {
+                        Alert.alert('Error', 'Server did not return OTP token. Please try again.');
+                        return;
+                    }
+
+                    // Navigate to OTP Screen
+                    if (isNameChanged) {
+                        dispatch(updateUserProfile({ fullName }))
+                            .unwrap()
+                            .then(() => {
+                                navigation.navigate('OtpVerify', {
+                                    type: 'UPDATE_PHONE',
+                                    email: user.email,
+                                    phoneNumber: phoneNumber,
+                                    username: user.username,
+                                    otpToken: otpToken
+                                });
+                            })
+                            .catch((err) => {
+                                // Name update failed
+                            });
+                    } else {
+                        navigation.navigate('OtpVerify', {
+                            type: 'UPDATE_PHONE',
+                            email: user.email,
+                            phoneNumber: phoneNumber,
+                            username: user.username,
+                            otpToken: otpToken
+                        });
+                    }
+                })
+                .catch((err) => {
+                    // Send OTP error handled in useEffect/slice
+                    Alert.alert('Error', err || 'Failed to send OTP');
+                });
+            return;
+        }
+
+        // Only name changed
+        if (isNameChanged) {
+            dispatch(updateUserProfile({ fullName }))
+                .unwrap()
+                .then(() => {
+                    if (Platform.OS === 'web') {
+                        alert('Cập nhật hồ sơ thành công');
+                        navigation.goBack();
+                    } else {
+                        Alert.alert('Thành công', 'Cập nhật hồ sơ thành công', [
+                            { text: 'OK', onPress: () => navigation.goBack() }
+                        ]);
+                    }
+                })
+                .catch((err) => {
+                    // Error is handled in useEffect
+                });
+        }
     };
 
     return (
